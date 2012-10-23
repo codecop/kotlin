@@ -30,8 +30,8 @@ import org.jetbrains.jet.lang.resolve.BindingTrace;
 import org.jetbrains.jet.lang.resolve.DescriptorResolver;
 import org.jetbrains.jet.lang.resolve.TemporaryBindingTrace;
 import org.jetbrains.jet.lang.resolve.TypeResolver;
-import org.jetbrains.jet.lang.resolve.calls.autocasts.AutoCastReceiver;
 import org.jetbrains.jet.lang.resolve.calls.autocasts.AutoCastServiceImpl;
+import org.jetbrains.jet.lang.resolve.calls.autocasts.AutoCastUtils;
 import org.jetbrains.jet.lang.resolve.calls.autocasts.DataFlowInfo;
 import org.jetbrains.jet.lang.resolve.calls.inference.*;
 import org.jetbrains.jet.lang.resolve.calls.model.ResolvedCall;
@@ -43,7 +43,6 @@ import org.jetbrains.jet.lang.resolve.calls.results.ResolutionStatus;
 import org.jetbrains.jet.lang.resolve.calls.tasks.ResolutionTask;
 import org.jetbrains.jet.lang.resolve.calls.tasks.TaskPrioritizer;
 import org.jetbrains.jet.lang.resolve.calls.tasks.TracingStrategy;
-import org.jetbrains.jet.lang.resolve.scopes.receivers.ExpressionReceiver;
 import org.jetbrains.jet.lang.resolve.scopes.receivers.ReceiverDescriptor;
 import org.jetbrains.jet.lang.types.*;
 import org.jetbrains.jet.lang.types.checker.JetTypeChecker;
@@ -56,8 +55,6 @@ import java.util.Map;
 import java.util.Set;
 
 import static org.jetbrains.jet.lang.diagnostics.Errors.*;
-import static org.jetbrains.jet.lang.resolve.BindingContext.AUTOCAST;
-import static org.jetbrains.jet.lang.resolve.BindingContext.EXPRESSION_TYPE;
 import static org.jetbrains.jet.lang.resolve.calls.results.ResolutionStatus.*;
 import static org.jetbrains.jet.lang.types.TypeUtils.NO_EXPECTED_TYPE;
 
@@ -201,8 +198,8 @@ public class CandidateResolver {
             candidateCall.addStatus(OTHER_ERROR);
         }
 
-        recordAutoCastIfNecessary(candidateCall.getReceiverArgument(), candidateCall.getTrace());
-        recordAutoCastIfNecessary(candidateCall.getThisObject(), candidateCall.getTrace());
+        AutoCastUtils.recordAutoCastIfNecessary(candidateCall.getReceiverArgument(), candidateCall.getTrace());
+        AutoCastUtils.recordAutoCastIfNecessary(candidateCall.getThisObject(), candidateCall.getTrace());
     }
 
     public <D extends CallableDescriptor> void completeTypeInferenceDependentOnExpectedTypeForCall(
@@ -516,26 +513,6 @@ public class CandidateResolver {
             this.argumentTypes = argumentTypes;
         }
 
-    }
-
-    private static void recordAutoCastIfNecessary(ReceiverDescriptor receiver, BindingTrace trace) {
-        if (receiver instanceof AutoCastReceiver) {
-            AutoCastReceiver autoCastReceiver = (AutoCastReceiver) receiver;
-            ReceiverDescriptor original = autoCastReceiver.getOriginal();
-            if (original instanceof ExpressionReceiver) {
-                ExpressionReceiver expressionReceiver = (ExpressionReceiver) original;
-                if (autoCastReceiver.canCast()) {
-                    trace.record(AUTOCAST, expressionReceiver.getExpression(), autoCastReceiver.getType());
-                    trace.record(EXPRESSION_TYPE, expressionReceiver.getExpression(), autoCastReceiver.getType());
-                }
-                else {
-                    trace.report(AUTOCAST_IMPOSSIBLE.on(expressionReceiver.getExpression(), autoCastReceiver.getType(), expressionReceiver.getExpression().getText()));
-                }
-            }
-            else {
-                assert autoCastReceiver.canCast() : "A non-expression receiver must always be autocastabe: " + original;
-            }
-        }
     }
 
     @NotNull
