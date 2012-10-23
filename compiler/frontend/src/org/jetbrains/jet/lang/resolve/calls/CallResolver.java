@@ -363,9 +363,9 @@ public class CallResolver {
 
                 ConstraintSystem systemWithCurrentSubstitution = constraintSystem.copy();
                 addConstraintForValueArgument(valueArgument, valueParameterDescriptor, constraintSystem.getCurrentSubstitutor(),
-                                              systemWithCurrentSubstitution, context);
+                                              systemWithCurrentSubstitution, context, null);
                 if (systemWithCurrentSubstitution.hasContradiction() || systemWithCurrentSubstitution.hasErrorInConstrainingTypes()) {
-                    addConstraintForValueArgument(valueArgument, valueParameterDescriptor, substituteDontCare, constraintSystem, context);
+                    addConstraintForValueArgument(valueArgument, valueParameterDescriptor, substituteDontCare, constraintSystem, context, null);
                 }
                 else {
                     constraintSystem = systemWithCurrentSubstitution;
@@ -753,9 +753,10 @@ public class CallResolver {
                 // Here we type check expecting an error type (DONT_CARE, substitution with substituteDontCare)
                 // and throw the results away
                 // We'll type check the arguments later, with the inferred types expected
-                boolean success = addConstraintForValueArgument(valueArgument, valueParameterDescriptor, substituteDontCare,
-                                                                constraintsSystem, context);
-                if (!success) {
+                boolean[] isErrorType = new boolean[1];
+                addConstraintForValueArgument(valueArgument, valueParameterDescriptor, substituteDontCare, constraintsSystem,
+                                              context, isErrorType);
+                if (isErrorType[0]) {
                     candidateCall.argumentHasNoType();
                 }
             }
@@ -806,7 +807,8 @@ public class CallResolver {
             @NotNull ValueParameterDescriptor valueParameterDescriptor,
             @NotNull TypeSubstitutor substitutor,
             @NotNull ConstraintSystem constraintSystem,
-            @NotNull ResolutionContext context) {
+            @NotNull ResolutionContext context,
+            @Nullable boolean[] isErrorType) {
 
         JetType effectiveExpectedType = getEffectiveExpectedType(valueParameterDescriptor, valueArgument);
         JetExpression argumentExpression = valueArgument.getArgumentExpression();
@@ -823,6 +825,9 @@ public class CallResolver {
         constraintSystem.addSupertypeConstraint(effectiveExpectedType, type, ConstraintPosition.getValueParameterPosition(
                 valueParameterDescriptor.getIndex()));
         //todo no return
+        if (isErrorType != null) {
+            isErrorType[0] = type == null || ErrorUtils.isErrorType(type);
+        }
         if (type == null || ErrorUtils.isErrorType(type)) return false;
         return true;
     }
