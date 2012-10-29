@@ -26,13 +26,8 @@ import org.jetbrains.annotations.Nullable;
 import org.jetbrains.jet.lang.descriptors.*;
 import org.jetbrains.jet.lang.diagnostics.Errors;
 import org.jetbrains.jet.lang.psi.*;
-import org.jetbrains.jet.lang.resolve.BindingTrace;
-import org.jetbrains.jet.lang.resolve.DescriptorResolver;
-import org.jetbrains.jet.lang.resolve.TemporaryBindingTrace;
-import org.jetbrains.jet.lang.resolve.TypeResolver;
-import org.jetbrains.jet.lang.resolve.calls.autocasts.AutoCastServiceImpl;
-import org.jetbrains.jet.lang.resolve.calls.autocasts.AutoCastUtils;
-import org.jetbrains.jet.lang.resolve.calls.autocasts.DataFlowInfo;
+import org.jetbrains.jet.lang.resolve.*;
+import org.jetbrains.jet.lang.resolve.calls.autocasts.*;
 import org.jetbrains.jet.lang.resolve.calls.inference.*;
 import org.jetbrains.jet.lang.resolve.calls.model.ResolvedCall;
 import org.jetbrains.jet.lang.resolve.calls.model.ResolvedCallImpl;
@@ -475,11 +470,13 @@ public class CandidateResolver {
             ReceiverDescriptor receiverParameter, ReceiverDescriptor receiverArgument,
             boolean isExplicitReceiver, boolean implicitInvokeCheck) {
 
+        BindingContext bindingContext = context.candidateCall.getTrace().getBindingContext();
+
         ResolutionStatus result = SUCCESS;
         if (receiverParameter.exists() && receiverArgument.exists()) {
             boolean safeAccess = isExplicitReceiver && !implicitInvokeCheck && candidateCall.isSafeCall();
             JetType receiverArgumentType = receiverArgument.getType();
-            AutoCastServiceImpl autoCastService = new AutoCastServiceImpl(context.dataFlowInfo, context.candidateCall.getTrace().getBindingContext());
+            AutoCastServiceImpl autoCastService = new AutoCastServiceImpl(context.dataFlowInfo, bindingContext);
             if (!safeAccess && !receiverParameter.getType().isNullable() && !autoCastService.isNotNull(receiverArgument)) {
 
                 context.tracing.unsafeCall(context.candidateCall.getTrace(), receiverArgumentType, implicitInvokeCheck);
@@ -496,7 +493,8 @@ public class CandidateResolver {
                     result = OTHER_ERROR;
                 }
             }
-            if (safeAccess && !receiverArgumentType.isNullable()) {
+            DataFlowValue receiverValue = DataFlowValueFactory.INSTANCE.createDataFlowValue(receiverArgument, bindingContext);
+            if (safeAccess && !context.dataFlowInfo.getNullability(receiverValue).canBeNull()) {
                 context.tracing.unnecessarySafeCall(context.candidateCall.getTrace(), receiverArgumentType);
             }
         }
